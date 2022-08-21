@@ -34,37 +34,51 @@ export class Source extends BaseSource<Record<string, never>> {
   async gather(
     args: GatherArguments<Record<string, never>>,
   ): Promise<DdcGatherItems> {
-    let copilot:
-      | Copilot
-      | undefined = undefined;
-
-    while (copilot?.suggestions == null) {
-      copilot = await buffers.get(args.denops, "_copilot") as
+    const f = async () => {
+      let copilot:
         | Copilot
-        | undefined;
+        | undefined = undefined;
 
-      await delay(10);
-    }
+      await args.denops.call("copilot#Next");
+      await args.denops.call("copilot#Previous");
 
-    return copilot.suggestions.map(({ text }) => {
-      const match = /^(?<indent>\s*).+/.exec(text);
-      const indent = match?.groups?.indent;
+      while (copilot?.suggestions == null) {
+        copilot = await buffers.get(args.denops, "_copilot") as
+          | Copilot
+          | undefined;
 
-      let info: string;
-      if (indent != null) {
-        info = text
-          .split("\n")
-          .map((line) => line.slice(indent.length))
-          .join("\n");
-      } else {
-        info = text;
+        await delay(10);
       }
-      return {
-        word: text.split("\n")[0].slice(args.completePos),
-        info,
-        menu: "copilot",
-        user_data: { word: text },
-      };
+
+      const items = copilot.suggestions.map(({ text }) => {
+        const match = /^(?<indent>\s*).+/.exec(text);
+        const indent = match?.groups?.indent;
+
+        let info: string;
+        if (indent != null) {
+          info = text
+            .split("\n")
+            .map((line) => line.slice(indent.length))
+            .join("\n");
+        } else {
+          info = text;
+        }
+
+        return {
+          word: text.split("\n")[0].slice(args.completePos),
+          info,
+          menu: "copilot",
+          user_data: { word: text },
+        };
+      });
+
+      args.denops.call("ddc#update_items", this.name, items);
+    };
+    f();
+
+    return await Promise.resolve({
+      items: [],
+      isIncomplete: true,
     });
   }
 
