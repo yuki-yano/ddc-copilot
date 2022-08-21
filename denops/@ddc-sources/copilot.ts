@@ -4,10 +4,7 @@ import {
   GatherArguments,
   OnCompleteDoneArguments,
 } from "https://deno.land/x/ddc_vim@v2.3.1/base/source.ts";
-import {
-  DdcGatherItems,
-  Item,
-} from "https://deno.land/x/ddc_vim@v2.3.1/types.ts";
+import { DdcGatherItems } from "https://deno.land/x/ddc_vim@v2.3.1/types.ts";
 import { delay } from "https://deno.land/std@0.123.0/async/delay.ts";
 
 export type CompletionMetadata = {
@@ -34,25 +31,9 @@ type Copilot = {
 };
 
 export class Source extends BaseSource<Record<string, never>> {
-  private counter = 0;
   async gather(
     args: GatherArguments<Record<string, never>>,
   ): Promise<DdcGatherItems> {
-    this.counter = (this.counter + 1) % 100;
-
-    const id = `source/${this.name}/${this.counter}`;
-    const [payload] = await Promise.all([
-      args.onCallback(id) as Promise<{
-        items: Item[];
-        isIncomplete: boolean;
-      }>,
-      this.request(id, args),
-    ]);
-
-    return { items: payload.items, isIncomplete: payload.isIncomplete };
-  }
-
-  async request(id: string, args: GatherArguments<Record<string, never>>) {
     let copilot:
       | Copilot
       | undefined = undefined;
@@ -62,15 +43,10 @@ export class Source extends BaseSource<Record<string, never>> {
         | Copilot
         | undefined;
 
-      // await args.denops.call("ddc#callback", id, {
-      //   items: [],
-      //   isIncomplete: false,
-      // });
-
       await delay(10);
     }
 
-    const items = copilot.suggestions.map(({ text }) => {
+    return copilot.suggestions.map(({ text }) => {
       const match = /^(?<indent>\s*).+/.exec(text);
       const indent = match?.groups?.indent;
 
@@ -89,11 +65,6 @@ export class Source extends BaseSource<Record<string, never>> {
         menu: "copilot",
         user_data: { word: text },
       };
-    });
-
-    args.denops.call("ddc#callback", id, {
-      items,
-      isIncomplete: true,
     });
   }
 
